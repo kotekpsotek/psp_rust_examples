@@ -1,20 +1,24 @@
 use core::ffi::c_void;
-
 use psp::sys::*;
+use psp::{vram_alloc::get_vram_allocator, Align16};
 
+/// Width for PSP Buffer (must accumulate the nearest 'double' amount greater then 'PSP_SCR_WIDTH' to swear all guarantes)
 const PSP_BUF_WIDTH: u16 = 512;
+/// PSP Screen width in pixels
 const PSP_SCR_WIDTH: u16 = 490;
+/// PSP Screen Height in pixels
 const PSP_SCR_HEIGHT: u16 = 272;
 
 // List which stores graphic command which next will be send to GPU to be executed in determined by itself direction
-static mut GRP_LIST: &[u8] = &[];
+static mut GRP_LIST: Align16<[u8; 0x40000]> = Align16([0; 0x40000]);
 
-/// Calculated required memory size (MB = Megabytes) for VRAM (Video Ram = Graphic card Ram) Buffer size
-fn get_memory_size(width: u16, height: u16, psm: TexturePixelFormat) -> u16 {
+/// Only as example: Calculated required memory size (MB = Megabytes) for VRAM (Video Ram = Graphic card Ram) Buffer size
+#[allow(dead_code)]
+fn get_memory_size(width: u16, height: u16, psm: TexturePixelFormat) -> u32 {
     use TexturePixelFormat::*;
 
     // Basic size calculating using known width and height within strict mode
-    let mut size = width * height;
+    let size = width as u32 * height as u32;
 
     // Convert calculated above "size" using definition of 'TexturePixelFormat'
     match psm {
@@ -31,37 +35,43 @@ fn get_memory_size(width: u16, height: u16, psm: TexturePixelFormat) -> u16 {
     }
 }
 
-/// Creates a VRAM buffer
-fn create_vram_buffer(width: u16, height: u16, psm: TexturePixelFormat) -> *mut u16 {
-    let mut offset: u16 = 0; // offset which will be increasing each time when user take new texture to VRAM Buffer
-    let result = &mut offset as *mut u16;
-    let mem_size: u16 = self::get_memory_size(width, height, psm);
+/// Only as example: Creates a VRAM buffer
+#[allow(dead_code)]
+fn create_vram_buffer(width: u16, height: u16, psm: TexturePixelFormat) -> *mut u32 {
+    let mut offset: u32 = 0; // offset which will be increasing each time when user take new texture to VRAM Buffer
+    let result = &mut offset as *mut u32;
+    let mem_size = self::get_memory_size(width, height, psm);
 
     offset += mem_size;
 
     result
 }
 
-// Assigning our created VRAM Buffer to the bengining of where VRAM is allocated (operation will be performing by CPU)
-unsafe fn get_vram_texture(width: u16, height: u16, psm: TexturePixelFormat) -> u16 {
+/// Only as example: Assigning our created VRAM Buffer to the bengining of where VRAM is allocated (operation will be performing by CPU)
+#[allow(dead_code)]
+unsafe fn get_vram_texture(width: u16, height: u16, psm: TexturePixelFormat) -> u32 {
     let result = create_vram_buffer(width, height, psm);
 
-    *result + *sceGeEdramGetAddr() as u16
+    *result + *sceGeEdramGetAddr() as u32
 }
 
+/// Make configuration setup for graphic
 unsafe fn init_graphic() {
+    // Simplifies video memory allocation for buffers
+    let allocator = get_vram_allocator().unwrap();
+
     // This is draw buffer (to draw something to the end before it will be displaying to user PSP screen)
-    let buf0 = create_vram_buffer(PSP_BUF_WIDTH, PSP_SCR_HEIGHT, TexturePixelFormat::PsmT4);
+    let buf0 = allocator.alloc_texture_pixels(PSP_BUF_WIDTH as u32, PSP_SCR_HEIGHT as u32, TexturePixelFormat::PsmT4).as_mut_ptr_from_zero();
     // This is displaying buffer (to display result of drawing to the screen of PSP). Displaying is performing by swaping 'buf1' content with contented graphic stored actualy in 'buf0'
-    let buf1 = create_vram_buffer(PSP_BUF_WIDTH, PSP_SCR_HEIGHT, TexturePixelFormat::PsmT4);
+    let buf1 = allocator.alloc_texture_pixels(PSP_BUF_WIDTH as u32, PSP_SCR_HEIGHT as u32, TexturePixelFormat::PsmT4).as_mut_ptr_from_zero();
     // This is to obtain static VRAM Buffer
-    let zbuf = create_vram_buffer(PSP_BUF_WIDTH, PSP_SCR_HEIGHT, TexturePixelFormat::Psm4444); // here is different texture pixel format equal to gray scale because zbuffer doesn't need to record and doesn't at all recording rdba colors set
+    let zbuf = allocator.alloc_texture_pixels(PSP_BUF_WIDTH as u32, PSP_SCR_HEIGHT as u32, TexturePixelFormat::Psm4444).as_mut_ptr_from_zero();
 
     // Init graphic as first step of graphic creation and displaying it
     sceGuInit();
 
     // Start filling list of commands to affort them to be recorded and next sent to GPU engine which initializes and setup context to displaying result of commands
-    sceGuStart(GuContextType::Direct, GRP_LIST.as_ptr() as *mut c_void);
+    sceGuStart(GuContextType::Direct, &mut GRP_LIST as *mut _ as *mut c_void);
 
     // Setup Draw buffer
     sceGuDrawBuffer(DisplayPixelFormat::Psm8888, buf0 as *mut c_void, PSP_BUF_WIDTH.into());
@@ -71,14 +81,86 @@ unsafe fn init_graphic() {
 
     // Setup Depth buffer
     sceGuDepthBuffer(zbuf as *mut c_void, PSP_BUF_WIDTH.into());
+
+    // Set virtual coordinate offset for PSP. To determine where rendering should happen
+    sceGuOffset((2048 - (PSP_SCR_WIDTH / 2)) as u32, (2048  - (PSP_SCR_HEIGHT / 2)) as u32);
+
+    // Set a viewport with specific size in specific screen point
+    sceGuViewport(2048, 2048, PSP_SCR_WIDTH as i32, PSP_SCR_HEIGHT as i32);
+
+    // Set range for calculations in buffer depth in inversed depth span (PSP uses inversed order of Depth Buffer)
+    sceGuDepthRange(u16::MAX as i32, 0);
+
+    // Cut everything what is outside screen width and height viewport from graphic rendering
+    sceGuEnable(GuState::ScissorTest);
+    sceGuScissor(0, 0, PSP_SCR_WIDTH.into(), PSP_SCR_HEIGHT.into());
+
+    // Enable and Select depth-test function
+    sceGuEnable(GuState::DepthTest);
+    sceGuDepthFunc(DepthFunc::Equal);
+
+    // Setup current front-face order
+    sceGuEnable(GuState::CullFace);
+    sceGuFrontFace(FrontFaceDirection::Clockwise);
+
+    // Setup shading model -> Smooth is per vertext thus not per pixel shading mode
+    sceGuShadeModel(ShadingModel::Smooth); 
+
+    // Setup last things for sceGu library
+    sceGuEnable(GuState::Texture2D); // textures modes 
+    sceGuEnable(GuState::ClipPlanes); // clip everything what is outside the rendering scene from rendering demand
+
+    // Finish sceGu configuration setup located in whole this function context
+    sceGuFinish(); // finish list and send it to execution (whole commands list setted up above)
+    sceGuSync(GuSyncMode::Finish, GuSyncBehavior::Wait); // waits until GPU executes all commands list to send another list of commands
+    sceDisplayWaitVblankStart(); // wait until next avaiable time to get next Vsync frame
+    sceGuDisplay(true); // enable PSP display to show graphic rendering status
 }
 
-pub unsafe fn background() -> () {
-    let mut should_run = true;
-    
-    while should_run {
-        
+/// To manage over **graphic rendering**
+struct GMng;
+impl GMng {
+    /// Stop rendering graphics
+    unsafe fn terminate_graphics() {
+        sceGuTerm();
     }
+
+    /// Start new frame
+    unsafe fn start_new_frame() {
+        sceGuStart(GuContextType::Direct, &mut GRP_LIST as *mut _ as *mut c_void);
+    }
+
+    /// End existing frame by displaying it on PSP screen
+    unsafe fn end_existing_frame() {
+        sceGuFinish(); // finish current display list
+        sceGuSync(GuSyncMode::Finish, GuSyncBehavior::Wait); // wait until GPU executes all commands list before send to execute new list with commands
+        sceDisplayWaitVblank(); // wait until next avaiable screen Vsync frame
+        sceGuSwapBuffers(); // swap draw buffer with display buffer to show graphic rendering result on PSP screen
+    }
+}
+
+/// Change color of PSP background screen
+pub unsafe fn background() -> () {
+    let should_run = true;
+
+    // Initialise graphic
+    init_graphic();
+    
+    // Loop to graphic rendering
+    while should_run {
+        GMng::start_new_frame();
+        
+        // Setup color in reverse RGBA order
+        sceGuClearColor(rgba(23, 165, 85, 0));
+
+        // Clear draw buffer of colors to show user color
+        sceGuClear(ClearBuffer::COLOR_BUFFER_BIT | ClearBuffer::DEPTH_BUFFER_BIT);
+
+        GMng::end_existing_frame();
+    }
+
+    // Stop graphic rendering
+    GMng::terminate_graphics();
 
     // Exit game at the end
     sceKernelExitGame();

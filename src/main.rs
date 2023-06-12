@@ -28,6 +28,7 @@ fn psp_main() {
         // let _ = time::base();
         // let _ = file_system::file_sys();
         // let _ = file_system::dir_sys();
-        let _ = graphics::background();
+        // let _ = graphics::background();
+        let _ = graphics::draw_shapes();
     }
 }

@@ -1,6 +1,8 @@
 use core::ffi::c_void;
 use psp::sys::*;
 use psp::{vram_alloc::get_vram_allocator, Align16};
+use embedded_graphics::{prelude::*, primitives::*, pixelcolor::Rgb888};
+use psp::embedded_graphics::Framebuffer;
 
 /// Width for PSP Buffer (must accumulate the nearest 'double' amount greater then 'PSP_SCR_WIDTH' to swear all guarantes)
 const PSP_BUF_WIDTH: u16 = 512;
@@ -55,7 +57,7 @@ unsafe fn get_vram_texture(width: u16, height: u16, psm: TexturePixelFormat) -> 
     *result + *sceGeEdramGetAddr() as u32
 }
 
-/// Make configuration setup for graphic
+/// Make configuration setup for graphic```
 unsafe fn init_graphic() {
     // Simplifies video memory allocation for buffers
     let allocator = get_vram_allocator().unwrap();
@@ -164,4 +166,48 @@ pub unsafe fn background() -> () {
 
     // Exit game at the end
     sceKernelExitGame();
+}
+
+/// Drawing shapes in PSP screen
+/// It's performing using 'embedded-graphic' crate which is doing this is in simplier way then native 'sceGu' = 'sceGum' library
+pub unsafe fn draw_shapes() -> () {
+    // Define buffer for frames
+    let mut display = Framebuffer::new();
+
+    // Add background color to drawing shape area
+    let _bckg_style = PrimitiveStyleBuilder::new()
+        .fill_color(Rgb888::new(27, 152, 87))
+        .build();
+    let _bckg = Rectangle::new(
+        Point::new(0, 0), 
+        Size::new(PSP_SCR_WIDTH.into(), PSP_SCR_HEIGHT.into())
+    );
+    display.fill_solid(&_bckg, Rgb888::new(23, 165, 85)).unwrap();
+
+    // Draw shapes
+        // Triangle drawning
+        //        2_Point = apex
+        //            /  \
+        //          /     \
+        //        /        \
+        //      /           \
+        //  [0_Point ===> 1_Point] = basis points
+    let rectangle_basis_width = 100;
+    let start_point_x = PSP_SCR_WIDTH / 2 - rectangle_basis_width / 2;
+    let middle_point_x = PSP_SCR_WIDTH / 2 - rectangle_basis_width / 2 + rectangle_basis_width / 2;
+    let end_point_x = PSP_SCR_WIDTH / 2 - rectangle_basis_width / 2 + rectangle_basis_width;
+    let _triangle = Triangle::new(
+        Point::new(start_point_x.into(), 100 + 30),
+        Point::new(end_point_x.into(), 100 + 30),
+        Point::new(middle_point_x.into(), 100),
+    )
+        .into_styled(
+        PrimitiveStyleBuilder::new()
+                .stroke_color(Rgb888::RED)
+                .fill_color(Rgb888::RED)
+                .stroke_width(1)
+                .build()
+        )
+        .draw(&mut display)
+        .unwrap();
 }

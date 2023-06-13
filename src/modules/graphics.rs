@@ -220,11 +220,43 @@ static TRIANGLE: Align16<[Vertex; 3]> = Align16([ // Each 'color' of course can 
     Vertex { color: rgba(210, 0, 238, 0), x: 0.0, y: 0.5, z: -10f32 }
 ]);
 
+/// Define points of rendering for square
+///    2/3------1
+///    |       |
+///    4------0/5
+static SQUARE: Align16<[Vertex; 6]> = Align16([
+    Vertex { color: rgba(14, 212, 106, 0), x: -0.15, y: -0.15, z: -10f32 },
+    Vertex { color: rgba(14, 212, 106, 0), x: -0.15, y: 0.15, z: -10f32 },
+    Vertex { color: rgba(14, 212, 106, 0), x: 0.15, y: 0.15, z: -10f32 },
+    Vertex { color: rgba(14, 212, 106, 0), x: 0.15, y: 0.15, z: -10f32 },
+    Vertex { color: rgba(14, 212, 106, 0), x: 0.15, y: -0.15, z: -10f32 },
+    Vertex { color: rgba(14, 212, 106, 0), x: -0.15, y: -0.15, z: -10f32 },
+]);
+
+/// Same schema as SQUARE
+static RECTANGLE: Align16<[Vertex; 6]> = Align16([
+    Vertex { color: rgba(247, 190, 3, 0), x: -0.15, y: -0.3, z: -10f32 },
+    Vertex { color: rgba(247, 190, 3, 0), x: -0.15, y: 0.3, z: -10f32 },
+    Vertex { color: rgba(247, 190, 3, 0), x: 0.15, y: 0.3, z: -10f32 },
+    Vertex { color: rgba(247, 190, 3, 0), x: 0.15, y: 0.3, z: -10f32 },
+    Vertex { color: rgba(247, 190, 3, 0), x: 0.15, y: -0.3, z: -10f32 },
+    Vertex { color: rgba(247, 190, 3, 0), x: -0.15, y: -0.3, z: -10f32 },
+]);
+
 /// Draw shapes in Graphic context using raw 'sceGu' library for this
 #[allow(unused_mut)]
 pub unsafe fn draw_shapes_native() {
     init_graphic();
     let mut draw = true;
+    let change_translate = |x: f32, y: f32, z: f32| {
+        // Reset 'Model' matrice
+        sceGumMatrixMode(MatrixMode::Model);
+        sceGumLoadIdentity();
+
+        // Change translate position
+        let position = ScePspFVector3 { x, y, z }; // defining position to change
+        sceGumTranslate(&position); // setup start position for drawning
+    };
 
     // Configure stuff for shapes drawning
     sceGumMatrixMode(MatrixMode::Projection); // whether user is in 3D (perspective matrix) or 2D (same view as creating)
@@ -250,8 +282,17 @@ pub unsafe fn draw_shapes_native() {
         sceGuClear(ClearBuffer::COLOR_BUFFER_BIT);
 
         // Draw shape of triangle
+        change_translate(-0.75, 0.15, 0f32);
         sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 3, core::ptr::null(), &TRIANGLE as *const _ as *const c_void); // 2. attribure specifies what is using for rendering the whole graphic shape (drawning points with Vertex type)
+        
+        // Draw shape of square
+        change_translate(0.0, 0.3, 0f32);
+        sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 6, core::ptr::null(), &SQUARE as *const _ as *const c_void);
 
+        // Draw shape of rectangle
+        change_translate(0.55, 0.45, 0f32);
+        sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 6, core::ptr::null(), &RECTANGLE as *const _ as *const c_void);
+        
         GMng::end_existing_frame();
     }
 

@@ -3,6 +3,7 @@ use psp::sys::*;
 use psp::{vram_alloc::get_vram_allocator, Align16};
 use embedded_graphics::{prelude::*, primitives::*, pixelcolor::Rgb888};
 use psp::embedded_graphics::Framebuffer;
+use crate::examples::types_def::Vertex;
 
 /// Width for PSP Buffer (must accumulate the nearest 'double' amount greater then 'PSP_SCR_WIDTH' to swear all guarantes)
 const PSP_BUF_WIDTH: u16 = 512;
@@ -210,4 +211,49 @@ pub unsafe fn draw_shapes() -> () {
         )
         .draw(&mut display)
         .unwrap();
+}
+
+/// Define point of rendering for triangle
+static TRIANGLE: Align16<[Vertex; 3]> = Align16([ // Each 'color' of course can be different but 'z' point for all 'indices' must be the same value
+    Vertex { color: rgba(210, 0, 238, 0), x: 0.35, y: 0.0, z: -10f32 },
+    Vertex { color: rgba(210, 10, 238, 0), x: -0.35, y: 0.0, z: -10f32 },
+    Vertex { color: rgba(210, 0, 238, 0), x: 0.0, y: 0.5, z: -10f32 }
+]);
+
+/// Draw shapes in Graphic context using raw 'sceGu' library for this
+#[allow(unused_mut)]
+pub unsafe fn draw_shapes_native() {
+    init_graphic();
+    let mut draw = true;
+
+    // Configure stuff for shapes drawning
+    sceGumMatrixMode(MatrixMode::Projection); // whether user is in 3D (perspective matrix) or 2D (same view as creating)
+    sceGumLoadIdentity(); // load default values to matrices (after multiplying values from matrices there isn't any result)
+    sceGumOrtho(-16.0 / 9.0, 16.0 / 9.0, -1.0, 1.0, -10.0, 10.0); // to apply 'ortho' projection matrix
+    // sceGumPerspective(50.0, 16f32 / 9f32, 0.5, 1000f32); // to apply perspective
+
+    sceGumMatrixMode(MatrixMode::View); // for camera perspective
+    sceGumLoadIdentity(); // same as above purpose
+
+    sceGumMatrixMode(MatrixMode::Model); // assest position of current rendering model
+    sceGumLoadIdentity(); // same as above purpose
+
+    while draw {
+        GMng::start_new_frame();
+
+        // Disable some unnsessary things
+        sceGuDisable(GuState::DepthTest);
+        sceGuDisable(GuState::Texture2D); // This must be disabled to show colors for 3D objects rendered on screen
+
+        // Apply color
+        sceGuClearColor(rgba(9, 15, 129, 0));
+        sceGuClear(ClearBuffer::COLOR_BUFFER_BIT);
+
+        // Draw shape of triangle
+        sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 3, core::ptr::null(), &TRIANGLE as *const _ as *const c_void); // 2. attribure specifies what is using for rendering the whole graphic shape (drawning points with Vertex type)
+
+        GMng::end_existing_frame();
+    }
+
+    GMng::terminate_graphics();
 }

@@ -14,6 +14,8 @@ mod examples {
     pub mod time;
     pub mod file_system;
     pub mod graphics;
+    #[path ="types.rs"]
+    pub mod types_def;
 }
 
 module!("PSP programming folder", 1, 0);
@@ -29,6 +31,7 @@ fn psp_main() {
         // let _ = file_system::file_sys();
         // let _ = file_system::dir_sys();
         // let _ = graphics::background();
-        let _ = graphics::draw_shapes();
+        // let _ = graphics::draw_shapes();
+        let _ = graphics::draw_shapes_native();
     }
 }

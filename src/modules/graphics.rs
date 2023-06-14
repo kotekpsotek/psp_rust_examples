@@ -1,4 +1,4 @@
-use core::ffi::c_void;
+use core::ffi::{c_void, c_short};
 use psp::sys::*;
 use psp::{vram_alloc::get_vram_allocator, Align16};
 use embedded_graphics::{prelude::*, primitives::*, pixelcolor::Rgb888};
@@ -220,6 +220,12 @@ static TRIANGLE: Align16<[Vertex; 3]> = Align16([ // Each 'color' of course can 
     Vertex { color: rgba(210, 0, 238, 0), x: 0.0, y: 0.5, z: -10f32 }
 ]);
 
+static TRIANGLE_2: Align16<[Vertex; 3]> = Align16([ // right triangle version
+    Vertex { color: rgba(247, 190, 3, 0), x: 0.0, y: 0.0, z: -10f32 },
+    Vertex { color: rgba(247, 190, 3, 0), x: -0.5, y: 0.0, z: -10f32 },
+    Vertex { color: rgba(247, 190, 3, 0), x: 0.0, y: 0.5, z: -10f32 }
+]);
+
 /// Define points of rendering for square
 ///    2/3------1
 ///    |       |
@@ -230,7 +236,7 @@ static SQUARE: Align16<[Vertex; 6]> = Align16([
     Vertex { color: rgba(14, 212, 106, 0), x: 0.15, y: 0.15, z: -10f32 },
     Vertex { color: rgba(14, 212, 106, 0), x: 0.15, y: 0.15, z: -10f32 },
     Vertex { color: rgba(14, 212, 106, 0), x: 0.15, y: -0.15, z: -10f32 },
-    Vertex { color: rgba(14, 212, 106, 0), x: -0.15, y: -0.15, z: -10f32 },
+    Vertex { color: rgba(14, 212, 106, 0), x: -0.15, y: -0.15, z: -10f32 }
 ]);
 
 /// Same schema as SQUARE
@@ -241,6 +247,20 @@ static RECTANGLE: Align16<[Vertex; 6]> = Align16([
     Vertex { color: rgba(247, 190, 3, 0), x: 0.15, y: 0.3, z: -10f32 },
     Vertex { color: rgba(247, 190, 3, 0), x: 0.15, y: -0.3, z: -10f32 },
     Vertex { color: rgba(247, 190, 3, 0), x: -0.15, y: -0.3, z: -10f32 },
+]);
+    
+    
+/// Indexed version of rectangle
+static RECTANGLE_INDX: Align16<[Vertex; 4]> = Align16([ // without double '2' and '0' indexes from normal 'RECTANGLE' list
+    Vertex { color: rgba(247, 190, 3, 0), x: -0.15, y: -0.3, z: -10f32 },
+    Vertex { color: rgba(14, 212, 106, 0), x: -0.15, y: 0.3, z: -10f32 },
+    Vertex { color: rgba(247, 190, 3, 0), x: 0.15, y: 0.3, z: -10f32 },
+    Vertex { color: rgba(210, 0, 238, 0), x: 0.15, y: -0.3, z: -10f32 }
+]);
+
+/// Indexes for 'RECTANGLE_INDX'
+static INDEXES_RECTANGLE: Align16<[c_short; 6]> = Align16([
+    0, 1, 2, 2, 3, 0
 ]);
 
 /// Draw shapes in Graphic context using raw 'sceGu' library for this
@@ -285,6 +305,10 @@ pub unsafe fn draw_shapes_native() {
         change_translate(-0.75, 0.15, 0f32);
         sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 3, core::ptr::null(), &TRIANGLE as *const _ as *const c_void); // 2. attribure specifies what is using for rendering the whole graphic shape (drawning points with Vertex type)
         
+        // Draw shape of straight triangle
+        change_translate(-0.75 + 0.35, -0.5, 0.0);
+        sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 3, core::ptr::null(), &TRIANGLE_2 as *const _ as *const c_void);
+
         // Draw shape of square
         change_translate(0.0, 0.3, 0f32);
         sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 6, core::ptr::null(), &SQUARE as *const _ as *const c_void);
@@ -292,6 +316,10 @@ pub unsafe fn draw_shapes_native() {
         // Draw shape of rectangle
         change_translate(0.55, 0.45, 0f32);
         sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 6, core::ptr::null(), &RECTANGLE as *const _ as *const c_void);
+        
+        // Draw shape of indexed rectangle
+        change_translate(0.55, -0.5 + 0.3 / 2f32, 0f32);
+        sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::INDEX_16BIT | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 6, &INDEXES_RECTANGLE as *const _ as *const c_void, &RECTANGLE_INDX as *const _ as *const c_void);
         
         GMng::end_existing_frame();
     }

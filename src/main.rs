@@ -4,7 +4,7 @@ use core::ffi::c_void;
 
 use psp::{ self, * };
 #[allow(unused_imports)]
-use examples::{tui_output, user_inputs, sounds, time, file_system, graphics};
+use examples::{tui_output, user_inputs, sounds, time, file_system, graphics, graphic_deps::shapes};
 
 #[path = "./modules"]
 mod examples {
@@ -16,6 +16,9 @@ mod examples {
     pub mod graphics;
     #[path ="types.rs"]
     pub mod types_def;
+    pub mod graphic_deps {
+        pub mod shapes;
+    }
 }
 
 module!("PSP programming folder", 1, 0);

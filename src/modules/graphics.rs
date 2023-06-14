@@ -4,6 +4,7 @@ use psp::{vram_alloc::get_vram_allocator, Align16};
 use embedded_graphics::{prelude::*, primitives::*, pixelcolor::Rgb888};
 use psp::embedded_graphics::Framebuffer;
 use crate::shapes::*;
+use crate::examples::types_def::Texture;
 
 /// Width for PSP Buffer (must accumulate the nearest 'double' amount greater then 'PSP_SCR_WIDTH' to swear all guarantes)
 const PSP_BUF_WIDTH: u16 = 512;
@@ -140,6 +141,58 @@ impl GMng {
         sceDisplayWaitVblank(); // wait until next avaiable screen Vsync frame
         sceGuSwapBuffers(); // swap draw buffer with display buffer to show graphic rendering result on PSP screen
     }
+
+    /// Loading texture and returning it as 'struct **Texture**' data type 'structure'
+    unsafe fn load_texture(src: &str) -> Texture {
+        // use 'stb' helping library
+        use stb::image::*;
+
+        // S.c: Helper functions
+        let pow2 = |num: i32| {
+            // Define variable which will be expanded by powering operation
+            let mut pw2 = 1;
+
+            // Power to moment when 'pw2' variable is greater then 'num' parameter
+            while pw2 < num {
+                pw2 <<= 1; // multiply pw2 by 2 in each loop iteration
+            };
+
+            // return result
+            pw2
+        };
+
+        // Storage for texture datas
+        let mut texture = Texture::default();
+        
+        // Flip loaded image
+        stbi_set_flip_vertically_on_load(true);
+
+        // Load image // TODO: Loading texture file defined under 'src' attribute
+        let image_data: &[u8] = &[]; 
+        let ld = stbi_load_from_memory(image_data, Channels::RgbAlpha)
+            .unwrap(); // FIXME: .unwrap() combinator isn't handled by 'psp' by default so this can cause unexpected behaviour
+            // Assign image properties to texture struct
+        texture.width = ld.0.width;
+        texture.height = ld.0.height;
+        texture.p_w = pow2(ld.0.width);
+        texture.p_h = pow2(ld.0.height);
+
+        // Define size of texture as bytes per pixel for calculate buffer size for texture
+        let size = texture.p_w * texture.p_h * 4; // times 4 because per 1 pixel are assigned 4 bytes
+
+        // TODO: ... Create data buffer and rest of loading texture with above 'todo' one
+
+        texture
+    }
+
+    /// Bind texture to GPU (texture application for next drawning element will be added to commands execution list)
+    unsafe fn bind_texture(texture: &Texture) {
+        sceGuTexMode(TexturePixelFormat::Psm8888, 0, 0, 1);
+        sceGuTexFunc(TextureEffect::Modulate, TextureColorComponent::Rgba); // setup texture color
+        sceGuTexFilter(TextureFilter::Nearest, TextureFilter::Nearest); // how textures are filtering
+        sceGuTexWrap(GuTexWrapMode::Repeat, GuTexWrapMode::Repeat); // Setup multiplying or cliping texture
+        sceGuTexImage(MipmapLevel::None, texture.p_w, texture.p_h, texture.p_w, texture.data); // Set texture to GPU with specified for function configuration
+    }
 }
 
 /// Change color of PSP background screen
@@ -240,10 +293,13 @@ pub unsafe fn draw_shapes_native() {
     sceGumMatrixMode(MatrixMode::Model); // assest position of current rendering model
     sceGumLoadIdentity(); // same as above purpose
 
+    // Load texture
+    let texture = GMng::load_texture("./files/texture.jpg");
+
     while draw {
         GMng::start_new_frame();
 
-        // Disable some unnsessary things
+        // Disable some unnsessary things // Must be enabled for texture loading
         sceGuDisable(GuState::DepthTest);
         sceGuDisable(GuState::Texture2D); // This must be disabled to show colors for 3D objects rendered on screen
 
@@ -271,6 +327,16 @@ pub unsafe fn draw_shapes_native() {
         change_translate(0.55, -0.5 + 0.3 / 2f32, 0f32);
         sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::INDEX_16BIT | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 6, &INDEXES_RECTANGLE as *const _ as *const c_void, &RECTANGLE_INDX as *const _ as *const c_void);
         
+        // Draw square with assigned texture
+            // Enabling required graphic stuff
+        sceGuEnable(GuState::DepthTest);
+        sceGuEnable(GuState::Texture2D);
+            // Drawning
+        change_translate(1.0, 0.5, 0.0); // change position of drawning
+        GMng::bind_texture(&texture); // Bind position texture for drawing shape
+        sceGumDrawArray(GuPrimitive::Triangles, VertexType::COLOR_8888 | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D, 6, core::ptr::null(), &SQUARE as *const _ as *const c_void);
+
+
         GMng::end_existing_frame();
     }
 

@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 embedded-graphics = "0.7.1"
 psp = { version = "0.3.6", features = ["embedded-graphics"] }
+stb = "=0.3.2"

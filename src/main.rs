@@ -1,10 +1,13 @@
 #![no_std]
 #![no_main]
+
 use core::ffi::c_void;
 
 use psp::{ self, * };
 #[allow(unused_imports)]
 use examples::{tui_output, user_inputs, sounds, time, file_system, graphics, graphic_deps::shapes};
+
+use crate::examples::types_def::Dimension;
 
 #[path = "./modules"]
 mod examples {
@@ -35,6 +38,11 @@ fn psp_main() {
         // let _ = file_system::dir_sys();
         // let _ = graphics::background();
         // let _ = graphics::draw_shapes();
-        let _ = graphics::draw_shapes_native();
+        // let _ = graphics::draw_shapes_native();
+        use examples::types_def::Texture;
+
+        let b = include_bytes!("../files/texture.jpg");
+        let d = Texture::tex_dimensions(b).unwrap();
+        dprintln!("{d:#?}");
     }
 }

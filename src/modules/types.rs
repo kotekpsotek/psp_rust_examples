@@ -1,9 +1,13 @@
 use core::ffi::c_void;
 
+use psp::Align16;
+
 /// It is using to represent one point of rendering in graphic
 /// It is also using pretty much as a default drawning mode for everything because it gives you necessary control over what you do
 #[repr(C)]
 pub struct Vertex {
+    pub u: f32,
+    pub v: f32,
     pub color: u32,
     pub x: f32,
     pub y: f32,
@@ -40,68 +44,16 @@ pub struct Dimension {
 
 impl Texture {
     /// Load texture widt it retured parameters
-    pub fn tex_load(bytes: &[u8]) -> Self {
+    pub fn tex_load(bytes: &[u8], d: Dimension) -> Self {
         // Get image dimensions
-        let [w, h] = match Self::tex_dimensions(bytes) {
-            Ok(Dimension { w, h }) => [w, h],
-            Err(_) => [0, 0]
-        };
+        let Dimension { w, h } = d;
 
         // Return ready texture object
         Self {
-            bytes: bytes as *const _ as *const c_void,
+            bytes: &Align16(bytes) as *const _ as *const c_void,
             width: w,
             height: h,
-            tbw: {
-                0
-            }
+            tbw: w.pow(2)
         }
-    }
-
-    /// Get image dimension
-    pub fn tex_dimensions(bytes: &[u8]) -> Result<Dimension, ()> {
-        // Works now only for JPG image types
-        let mut off = 0;
-        while off < bytes.len() {
-            while bytes[off]==0xff {
-                off+=1;
-            }
-
-            let mrkr = bytes[off];
-            off += 1;
-            
-            if mrkr==0xd8 { // SOI
-                continue;
-            }
-            
-            if mrkr==0xd9 { // EOI
-                break;
-            }
-
-            if 0xd0<=mrkr && mrkr<=0xd7 {
-                continue;
-            }
-
-            if mrkr==0x01 { // TEM
-                continue;
-            }
-
-            let len = (bytes[off].wrapping_shl(8)) | bytes[off+1];  
-            off+=2;  
-            
-            if mrkr == 0xc0 {
-                let w = ((bytes[off+3].wrapping_shl(8)) | bytes[off+4]) as i32;
-                let h = ((bytes[off+1].wrapping_shl(8)) | bytes[off+2]) as i32;
-                
-                return Ok(Dimension {
-                    w,
-                    h
-                })
-            }
-
-            off += len.wrapping_sub(2) as usize;
-        };
-
-        return Err(());
     }
 }

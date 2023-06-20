@@ -38,11 +38,6 @@ fn psp_main() {
         // let _ = file_system::dir_sys();
         // let _ = graphics::background();
         // let _ = graphics::draw_shapes();
-        // let _ = graphics::draw_shapes_native();
-        use examples::types_def::Texture;
-
-        let b = include_bytes!("../files/texture.jpg");
-        let d = Texture::tex_dimensions(b).unwrap();
-        dprintln!("{d:#?}");
+        let _ = graphics::draw_shapes_native();
     }
 }
